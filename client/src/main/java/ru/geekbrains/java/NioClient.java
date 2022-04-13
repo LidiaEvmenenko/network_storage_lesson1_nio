@@ -1,43 +1,61 @@
 package ru.geekbrains.java;
 
+import java.io.BufferedWriter;
+import java.io.DataInputStream;
 import java.io.IOException;
+import java.io.OutputStreamWriter;
 import java.net.InetSocketAddress;
+import java.net.Socket;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
 import java.time.LocalDateTime;
+import java.util.Scanner;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 public class NioClient {
-    private final static ExecutorService THREAD_POOL = Executors.newFixedThreadPool(5);
-
     public static void main(String[] args) {
-        try {
-            new NioClient().start();
-        } finally {
-            THREAD_POOL.shutdown();
-        }
+        new NioClient().start();
     }
 
     public void start(){
-        for (int i = 0; i < 5; i++) {
-            THREAD_POOL.execute(() ->{
-                System.out.println("New client started on thread " + Thread.currentThread().getName());
+        try {
+            Socket socket = new Socket("localhost", 9000);
+            DataInputStream reader = new DataInputStream(socket.getInputStream());
+            BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(socket.getOutputStream()));
+            Scanner in = new Scanner(System.in);
+            new Thread(() -> {
                 try {
-                    SocketChannel channel = SocketChannel.open(new InetSocketAddress("localhost", 9000));
                     while (true) {
-                        channel.write(ByteBuffer.wrap(String.format(
-                                "[%s] Message from thread %s",
-                                LocalDateTime.now(),
-                                Thread.currentThread().getName()
-                        ).getBytes()));
-                        Thread.sleep(3000);
+                        byte c;
+                        while ((c = reader.readByte()) != -1) {
+                            System.out.print((char) c);
+                        }
                     }
-                } catch (IOException | InterruptedException e){
+                } catch (IOException e) {
                     e.printStackTrace();
                 }
-            });
+            }).start();
+            String s;
+            while (true) {
+                System.out.println("Введите сообщение:");
+                s = in.next();
+                writer.write(s);
+                writer.flush();
+                Thread.sleep(3000);
+                writer.newLine();
+                writer.flush();
+                if (s.equals("0")) {
+                    writer.close();
+                    reader.close();
+                    socket.close();
+                    break;
+                }
+            }
+        } catch (IOException | InterruptedException e) {
+            e.printStackTrace();
         }
+
     }
 
 }
