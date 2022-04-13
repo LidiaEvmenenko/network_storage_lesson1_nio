@@ -7,10 +7,14 @@ import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
+import java.nio.charset.StandardCharsets;
 import java.util.Iterator;
 import java.util.Set;
 
 public class NioServer {
+    private boolean textIsNotReceived = true;
+    private String message=null;
+    private String messageNewLine=null;
 
     public static void main(String[] args) throws IOException {
         new NioServer().start();
@@ -36,7 +40,7 @@ public class NioServer {
                 }
                 if (selectionKey.isReadable()){
                     System.out.println("New selector readable event.");
-                    readMessage(selectionKey);
+                    readAndEcho(selectionKey);
                 }
                 iterator.remove();
 
@@ -51,12 +55,28 @@ public class NioServer {
 
     }
 
-    private void readMessage(SelectionKey key) throws IOException {
+    private void readAndEcho(SelectionKey key) throws IOException {
         SocketChannel client = (SocketChannel) key.channel();
         ByteBuffer byteBuffer = ByteBuffer.allocate(256);
-        client.read(byteBuffer);
-        String message  = new String(byteBuffer.array());
-        System.out.println("New message: " + message + ". Thread name: " + Thread.currentThread().getName());
+        int c =client.read(byteBuffer);
+        byte[] bytes = new byte[c];
+        for (int i=0; i<c; i++){
+            bytes[i] = byteBuffer.get(i);
+        }
+        if (textIsNotReceived) {
+            message = new String(bytes);
+            textIsNotReceived = false;
+        } else {
+            messageNewLine = new String(bytes);
+            textIsNotReceived = true;
+            if (message.equals("0")) {
+                client.close();
+                return;
+            }
+            StringBuilder echoMessage = new StringBuilder("ECHO: ");
+            echoMessage.append(message).append(messageNewLine);
+            client.write(ByteBuffer.wrap(echoMessage.toString().getBytes(StandardCharsets.UTF_8)));
+        }
     }
 
 }
